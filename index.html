@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pocket Kids</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { --pad:16px; --br:12px; --muted:#666; --bd:#e6e6e6; }
+    body { margin: var(--pad); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    h1 { margin: 0 0 6px 0; font-size: 22px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .card { border: 1px solid var(--bd); border-radius: var(--br); padding: var(--pad); margin: 10px 0; background:#fff; }
+    .chip { border:1px solid var(--bd); border-radius:999px; padding:6px 10px; font-size:14px; }
+    .btn { padding:10px 14px; border-radius:10px; border:0; cursor:pointer; }
+    .btn-p { background:#2563eb; color:#fff; }
+    .btn-g { background:#10b981; color:#fff; }
+    .btn-o { background:#ef4444; color:#fff; }
+    .btn-s { background:#f3f4f6; }
+    .inline { display:inline-block; }
+    input { padding:10px; border:1px solid var(--bd); border-radius:10px; min-width:0; }
+    .kid { border:1px solid var(--bd); border-radius:12px; padding:12px; }
+    .muted { color: var(--muted); }
+    .krow { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .g { display:grid; gap:10px; }
+    .rules { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .tag { font-size:12px; color:var(--muted); }
+    .disabled { opacity: .5; pointer-events: none; }
+    .divider { height:1px; background:var(--bd); margin:10px 0; }
+    @media (prefers-color-scheme: dark) {
+      body { background:#0f0f0f; color:#e5e7eb; }
+      .card { background:#171717; border-color:#262626; }
+      .chip { border-color:#262626; }
+      input { background:#0f0f0f; color:#e5e7eb; border-color:#262626; }
+      .btn-s { background:#1f2937; color:#e5e7eb; }
+    }
+  </style>
+</head>
+<body>
+  <div id="hello" class="muted">Загрузка…</div>
+
+  <div class="card">
+    <h1>Семейный кошелёк</h1>
+    <div class="row">
+      <div class="chip">Старт понедельник: <b id="startAmount">200</b> MXN</div>
+      <div class="chip">Следующая выплата: <b id="nextPayout"></b></div>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn btn-s" id="editRules">Правила</button>
+      <button class="btn btn-s" id="historyBtn">История</button>
+      <button class="btn btn-g" id="payoutBtn">Закрыть неделю (выплата)</button>
+      <button class="btn btn-o" id="resetWeekBtn">Сбросить текущую неделю</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="gap:8px;">
+      <input id="kidName" placeholder="Имя ребёнка" />
+      <button class="btn btn-p" id="addKid">Добавить ребёнка</button>
+    </div>
+    <div id="kids" class="g" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- Модалка -->
+  <div id="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.15);">
+    <div class="card" style="max-width:520px; margin:10vh auto; background:inherit;">
+      <div id="modalContent"></div>
+      <div class="row" style="justify-content:flex-end; margin-top:10px;">
+        <button class="btn btn-s" id="closeModal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------- Telegram Mini App boot ---------- */
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+/* ---------- State ---------- */
+const LS_KEY = 'pocket-kids-v1';
+const presetRules = [
+  // Плюсы (раз в день)
+  { id:'math',    title:'Математика', type:'plus',  amount:+10, dailyOnce:true },
+  { id:'reading', title:'Чтение',     type:'plus',  amount:+10, dailyOnce:true },
+  { id:'writing', title:'Письмо',     type:'plus',  amount:+10, dailyOnce:true },
+  // Минусы (без лимита)
+  { id:'fight',   title:'Драка',          type:'minus', amount:-10, dailyOnce:false },
+  { id:'swear',   title:'Мат',            type:'minus', amount:-10, dailyOnce:false },
+  { id:'badfood', title:'Плохо поел',     type:'minus', amount:-10, dailyOnce:false },
+  { id:'hyper',   title:'Бесиловка',      type:'minus', amount:-10, dailyOnce:false },
+];
+
+let state = load() ?? {
+  startAmount: 200,
+  rules: presetRules,
+  kids: [],
+  events: [],   // {id, kidId, ruleId, title, amount, ts}
+  payouts: []   // {weekStartISO, weekEndISO, kidId, amount, ts}
+};
+
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){ return null; } }
+
+/* ---------- Time helpers ---------- */
+function mondayOfWeek(d=new Date()){
+  const nd = new Date(d);
+  const day = nd.getDay(); // 0=Sun,1=Mon...
+  const diff = (day === 0 ? -6 : (1 - day)); // delta до понедельника
+  nd.setHours(0,0,0,0);
+  nd.setDate(nd.getDate() + diff);
+  return nd;
+}
+function sunday2000(d=new Date()){
+  const mon = mondayOfWeek(d);
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(20,0,0,0); // 20:00
+  return sun;
+}
+function isSameDay(a,b){
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+function weekRange(d=new Date()){
+  const start = mondayOfWeek(d);
+  const end = new Date(start); end.setDate(start.getDate()+6); end.setHours(23,59,59,999);
+  return {start, end};
+}
+
+/* ---------- Core calc ---------- */
+function eventsThisWeek(kidId){
+  const {start, end} = weekRange(new Date());
+  return state.events.filter(e => e.kidId===kidId && new Date(e.ts)>=start && new Date(e.ts)<=end);
+}
+function todayUses(kidId, ruleId){
+  const now = new Date();
+  return state.events.filter(e => e.kidId===kidId && e.ruleId===ruleId && isSameDay(new Date(e.ts), now)).length;
+}
+function balanceFor(kidId){
+  const base = state.startAmount;
+  const sum = eventsThisWeek(kidId).reduce((a,e)=>a+e.amount, 0);
+  return base + sum;
+}
+
+/* ---------- UI ---------- */
+const hello = document.getElementById('hello');
+hello.textContent = tg?.initDataUnsafe?.user?.first_name
+  ? `Привет, ${tg.initDataUnsafe.user.first_name}!`
+  : 'Привет! Открой меня из бота, чтобы я узнал твоё имя.';
+
+document.getElementById('startAmount').textContent = state.startAmount;
+document.getElementById('nextPayout').textContent = sunday2000().toLocaleString();
+
+document.getElementById('addKid').onclick = ()=>{
+  const name = document.getElementById('kidName').value?.trim();
+  if(!name) return;
+  const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()+Math.random());
+  state.kids.push({ id, name });
+  save(); renderKids();
+  document.getElementById('kidName').value='';
+};
+
+function renderKids(){
+  const wrap = document.getElementById('kids');
+  wrap.innerHTML = '';
+  if(!state.kids.length){
+    const d = document.createElement('div');
+    d.className='muted'; d.textContent='Добавь хотя бы одного ребёнка ↑';
+    wrap.appendChild(d); return;
+  }
+  state.kids.forEach(k=>{
+    const b = balanceFor(k.id);
+    const div = document.createElement('div');
+    div.className='kid';
+    div.innerHTML = `
+      <div class="krow">
+        <div><b>${k.name}</b><div class="tag">Баланс: <span id="bal-${k.id}">${b}</span> MXN</div></div>
+        <div class="row">
+          <button class="btn btn-g" data-a="+10">+10</button>
+          <button class="btn btn-o" data-a="-10">-10</button>
+        </div>
+      </div>
+      <div class="rules" id="rules-${k.id}"></div>
+      <div class="divider"></div>
+      <div class="muted" style="font-size:13px;">Последние события:</div>
+      <div id="feed-${k.id}" class="g"></div>
+    `;
+    wrap.appendChild(div);
+
+    // Быстрые +10/−10
+    div.querySelectorAll('button[data-a]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const amount = parseInt(btn.dataset.a, 10);
+        addEvent(k.id, {ruleId:null, title: amount>0?'Поощрение':'Штраф', amount});
+      };
+    });
+
+    // Правила
+    const rulesWrap = div.querySelector(`#rules-${k.id}`);
+    rulesWrap.innerHTML = '';
+    state.rules.forEach(r=>{
+      const uses = r.dailyOnce ? todayUses(k.id, r.id) : 0;
+      const disabled = r.dailyOnce && uses>=1;
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-s inline' + (disabled?' disabled':'');
+      btn.title = r.dailyOnce ? 'Можно 1 раз в день' : 'Без лимита';
+      btn.textContent = `${r.title} ${r.amount>0?`+${r.amount}`:`${r.amount}`} ${r.dailyOnce?'(1/д)':''}`;
+      btn.onclick = ()=> addEvent(k.id, {ruleId:r.id, title:r.title, amount:r.amount});
+      rulesWrap.appendChild(btn);
+    });
+
+    renderFeed(k.id);
+  });
+}
+function renderFeed(kidId){
+  const node = document.getElementById(`feed-${kidId}`);
+  const list = eventsThisWeek(kidId).slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts)).slice(0,6);
+  node.innerHTML=''; 
+  if(!list.length){ node.innerHTML='<span class="muted">Пусто</span>'; return; }
+  list.forEach(e=>{
+    const row = document.createElement('div');
+    row.className='row'; 
+    row.innerHTML = `
+      <div class="chip">${new Date(e.ts).toLocaleString()}</div>
+      <div>${e.title}</div>
+      <b>${e.amount>0?`+${e.amount}`:e.amount}</b>
+    `;
+    node.appendChild(row);
+  });
+}
+
+function addEvent(kidId, {ruleId, title, amount}){
+  // дневной лимит для dailyOnce
+  if(ruleId){
+    const r = state.rules.find(x=>x.id===ruleId);
+    if(r?.dailyOnce && todayUses(kidId, ruleId)>=1){
+      alert('Это правило можно применить только 1 раз в день.');
+      return;
+    }
+  }
+  state.events.push({
+    id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()+Math.random()),
+    kidId, ruleId, title, amount,
+    ts: new Date().toISOString()
+  });
+  save();
+  const el = document.getElementById(`bal-${kidId}`);
+  if (el) el.textContent = balanceFor(kidId);
+  renderKids();
+}
+
+document.getElementById('payoutBtn').onclick = ()=>{
+  const {start, end} = weekRange(new Date());
+  state.kids.forEach(k=>{
+    const amount = balanceFor(k.id);
+    state.payouts.push({
+      weekStartISO: start.toISOString(),
+      weekEndISO: end.toISOString(),
+      kidId: k.id,
+      amount,
+      ts: new Date().toISOString()
+    });
+  });
+  // очищаем события недели
+  const nextWeekStart = new Date(end); nextWeekStart.setDate(end.getDate()+1); nextWeekStart.setHours(0,0,0,0);
+  state.events = state.events.filter(e => new Date(e.ts) >= nextWeekStart);
+  save(); renderKids(); alert('Неделя зафиксирована. Выплата записана в историю.');
+};
+
+document.getElementById('resetWeekBtn').onclick = ()=>{
+  const {start, end} = weekRange(new Date());
+  state.events = state.events.filter(e => !(new Date(e.ts)>=start && new Date(e.ts)<=end));
+  save(); renderKids();
+};
+
+document.getElementById('historyBtn').onclick = ()=> openModalHistory();
+document.getElementById('editRules').onclick = ()=> openModalRules();
+document.getElementById('closeModal').onclick = ()=> document.getElementById('modal').style.display='none';
+
+function openModalRules(){
+  const box = document.getElementById('modalContent'); box.innerHTML='';
+  const h = document.createElement('div'); h.innerHTML='<h3>Правила</h3><div class="muted">У учебных правил стоит лимит 1 раз в день.</div>';
+  box.appendChild(h);
+  state.rules.forEach(r=>{
+    const row = document.createElement('div'); row.className='krow'; row.style.margin='8px 0';
+    row.innerHTML = `<div><b>${r.title}</b> <span class="tag">${r.type==='plus'?'+':''}${r.amount} • ${r.dailyOnce?'1/день':'без лимита'}</span></div>`;
+    box.appendChild(row);
+  });
+  document.getElementById('modal').style.display='block';
+}
+
+function openModalHistory(){
+  const box = document.getElementById('modalContent'); box.innerHTML='';
+  const h = document.createElement('div'); h.innerHTML='<h3>История выплат</h3>';
+  box.appendChild(h);
+  if(!state.payouts.length){ box.innerHTML += '<div class="muted">Пока пусто</div>'; }
+  state.payouts.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts)).forEach(p=>{
+    const kid = state.kids.find(k=>k.id===p.kidId);
+    const row = document.createElement('div'); row.className='row';
+    row.innerHTML = `<div class="chip">${new Date(p.weekStartISO).toLocaleDateString()}–${new Date(p.weekEndISO).toLocaleDateString()}</div>
+      <div>${kid?.name||'Ребёнок'}</div>
+      <b>${p.amount} MXN</b>`;
+    box.appendChild(row);
+  });
+  document.getElementById('modal').style.display='block';
+}
+
+/* first render */
+renderKids();
+</script>
+</body>
+</html>
