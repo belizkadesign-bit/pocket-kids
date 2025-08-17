@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pocket Kids — v3 (roles & invites)</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { --pad:16px; --br:14px; --muted:#666; --bd:#e6e6e6; --bg:#ffffff; --bg2:#f7f7f8; }
+    html,body { height:100%; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg2); color:#111; }
+    header { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--bd); padding:10px var(--pad); z-index:10; }
+    .wrap { padding: var(--pad); max-width: 900px; margin: 0 auto; }
+    h1 { margin: 6px 0 10px 0; font-size: 22px; }
+    h2 { margin: 0 0 8px 0; font-size: 18px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .card { background:var(--bg); border:1px solid var(--bd); border-radius:var(--br); padding: var(--pad); }
+    .chip { border:1px solid var(--bd); border-radius:999px; padding:6px 10px; font-size:13px; background:#fff; }
+    .btn { padding:10px 14px; border-radius:10px; border:0; cursor:pointer; }
+    .btn-p { background:#2563eb; color:#fff; }
+    .btn-g { background:#10b981; color:#fff; }
+    .btn-o { background:#ef4444; color:#fff; }
+    .btn-s { background:#f3f4f6; }
+    .btn-disabled { opacity:.5; pointer-events:none; }
+    input, select { padding:10px; border:1px solid var(--bd); border-radius:10px; min-width:0; background:#fff; }
+    .list { display:grid; gap:10px; }
+    .item { background:#fff; border:1px solid var(--bd); border-radius:12px; padding:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .muted { color:var(--muted); }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; }
+    .tab { padding:8px 12px; border:1px solid var(--bd); background:#fff; border-radius:999px; cursor:pointer; }
+    .tab.active { background:#111; color:#fff; border-color:#111; }
+    .grid { display:grid; gap:10px; }
+    .two { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .three { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .divider { height:1px; background:var(--bd); margin:12px 0; }
+    .right { margin-left:auto; }
+    .tag { font-size:12px; color:var(--muted); }
+    .sticky-cta { position:sticky; bottom:0; background:var(--bg); border-top:1px solid var(--bd); padding:10px var(--pad); display:flex; justify-content:flex-end; gap:8px; z-index:9; }
+    @media (max-width: 640px){ .two,.three{ grid-template-columns: 1fr; } }
+    @media (prefers-color-scheme: dark) {
+      body{ background:#0f0f0f; color:#e5e7eb; }
+      header, .card, .item, .chip, input, select { background:#171717; border-color:#262626; color:#e5e7eb; }
+      .tab { background:#171717; border-color:#262626; color:#e5e7eb; }
+      .tab.active { background:#e5e7eb; color:#0f0f0f; border-color:#e5e7eb; }
+      .btn-s { background:#1f2937; color:#e5e7eb; }
+    }
+    .modal { position:fixed; inset:0; display:none; background:rgba(0,0,0,.2); place-items:center; padding: 20px; }
+    .modal .inner { max-width:720px; width:100%; }
+    .step { display:none; }
+    .step.active { display:block; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="row">
+      <div id="hello" class="muted">Загрузка…</div>
+      <div class="right tabs" id="tabs">
+        <div class="tab active" data-tab="home">Действия</div>
+        <div class="tab" data-tab="family">Семья</div>
+        <div class="tab" data-tab="rules">Правила</div>
+        <div class="tab" data-tab="history">История</div>
+        <div class="tab" data-tab="settings">Настройки</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section id="home" class="grid">
+      <div class="card">
+        <h2>Быстрые действия</h2>
+        <div class="row">
+          <div class="chip">Роль: <b id="roleChip">—</b></div>
+          <div class="chip">Период: <b id="periodChip">—</b></div>
+          <div class="chip">Стартовая сумма: <b id="startChip">—</b> <span id="currChip">MXN</span></div>
+          <div class="chip">Окончание периода: <b id="periodEnd">—</b></div>
+        </div>
+        <div class="muted" id="childHint" style="display:none;margin-top:6px;">Вы вошли как ребёнок: действия недоступны, только просмотр.</div>
+      </div>
+      <div class="grid two" id="childrenCards"></div>
+      <div class="sticky-cta">
+        <button class="btn btn-g" id="closePeriodBtn">Закрыть период (выплата)</button>
+        <button class="btn btn-s" id="resetPeriodBtn">Сбросить события периода</button>
+      </div>
+    </section>
+
+    <section id="family" class="grid" style="display:none;">
+      <div class="card">
+        <h2>Взрослые</h2>
+        <div class="row">
+          <input id="adultName" placeholder="Имя взрослого" />
+          <button class="btn btn-p" id="addAdult">Добавить</button>
+          <button class="btn btn-s" id="inviteAdult">Пригласить в Telegram</button>
+        </div>
+        <div class="list" id="adultsList"></div>
+      </div>
+      <div class="card">
+        <h2>Дети</h2>
+        <div class="row">
+          <input id="childName" placeholder="Имя ребёнка" />
+          <button class="btn btn-p" id="addChild">Добавить</button>
+          <button class="btn btn-s" id="inviteChild">Пригласить ребёнка</button>
+        </div>
+        <div class="list" id="kidsList"></div>
+      </div>
+    </section>
+
+    <section id="rules" class="grid" style="display:none;">
+      <div class="card">
+        <h2>Создать правило</h2>
+        <div class="grid two">
+          <select id="ruleType">
+            <option value="plus">Награда (+)</option>
+            <option value="minus">Наказание (−)</option>
+          </select>
+          <input id="ruleTitle" placeholder="Название (например: Чтение)" />
+          <input id="ruleAmount" placeholder="Сумма (например: 10)" type="number" />
+          <select id="ruleScope">
+            <option value="all">Для всех детей</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-g" id="createRule">Добавить правило</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Список правил</h2>
+        <div class="list" id="rulesList"></div>
+      </div>
+    </section>
+
+    <section id="history" class="grid" style="display:none;">
+      <div class="card">
+        <h2>История событий</h2>
+        <div class="list" id="eventsList"></div>
+      </div>
+      <div class="card">
+        <h2>История выплат</h2>
+        <div class="list" id="payoutsList"></div>
+      </div>
+    </section>
+
+    <section id="settings" class="grid" style="display:none;">
+      <div class="card">
+        <h2>Параметры</h2>
+        <div class="grid two">
+          <label class="row" style="gap:8px;">
+            <span class="chip">Моя роль</span>
+            <select id="myRole">
+              <option value="adult">Взрослый</option>
+              <option value="child">Ребёнок</option>
+            </select>
+          </label>
+          <label class="row" style="gap:8px;" id="asChildWrap">
+            <span class="chip">Смотреть как ребёнок</span>
+            <select id="asChild"></select>
+          </label>
+          <input id="startAmount" type="number" placeholder="Стартовая сумма (например 200)" />
+          <select id="period">
+            <option value="week">Неделя</option>
+            <option value="month">Месяц</option>
+          </select>
+          <select id="currency">
+            <option value="MXN">MXN</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-g" id="saveSettings">Сохранить</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+// Telegram
+const tg = window.Telegram?.WebApp; if (tg) { tg.ready(); tg.expand(); }
+
+// State
+const LS_KEY='pk-v3';
+let S = load() ?? {
+  family:{adults:[], kids:[], currency:'MXN'},
+  settings:{ startAmount:200, period:'week', currency:'MXN', myRole:'adult', asChild:null },
+  rules:[],
+  events:[],
+  payouts:[]
+};
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(S)); }
+function load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){ return null; } }
+
+// Helpers
+function periodRange(ref=new Date()){
+  if(S.settings.period==='month'){
+    const y=ref.getFullYear(), m=ref.getMonth();
+    return { start:new Date(y,m,1,0,0,0,0), end:new Date(y,m+1,0,23,59,59,999) };
+  } else {
+    const d=new Date(ref); const day=d.getDay(); const diff=(day===0?-6:(1-day));
+    d.setHours(0,0,0,0); d.setDate(d.getDate()+diff);
+    const end = new Date(d); end.setDate(d.getDate()+6); end.setHours(23,59,59,999);
+    return { start:d, end };
+  }
+}
+function eventsThisPeriod(kidId){
+  const {start,end} = periodRange(new Date());
+  return S.events.filter(e => e.kidId===kidId && new Date(e.ts)>=start && new Date(e.ts)<=end);
+}
+function balanceFor(kidId){
+  const base = Number(S.settings.startAmount||0);
+  const sum = eventsThisPeriod(kidId).reduce((a,e)=>a+Number(e.amount||0),0);
+  return base + sum;
+}
+const hello = document.getElementById('hello');
+hello.textContent = tg?.initDataUnsafe?.user?.first_name ? `Привет, ${tg.initDataUnsafe.user.first_name}!` : 'Привет!';
+
+// Tabs
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+function switchTab(id){
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab===id));
+  ['home','family','rules','history','settings'].forEach(s => {
+    document.getElementById(s).style.display = (s===id?'grid':'none');
+  });
+  renderAll();
+}
+
+// Family
+document.getElementById('addAdult').onclick = ()=>{
+  const el = document.getElementById('adultName'); const name = el.value.trim(); if(!name) return;
+  S.family.adults.push({ id: crypto.randomUUID?.()||String(Date.now()+Math.random()), name });
+  el.value=''; save(); renderFamily();
+};
+document.getElementById('addChild').onclick = ()=>{
+  const el = document.getElementById('childName'); const name = el.value.trim(); if(!name) return;
+  const id = crypto.randomUUID?.()||String(Date.now()+Math.random());
+  S.family.kids.push({ id, name });
+  if(!S.settings.asChild) S.settings.asChild = id;
+  el.value=''; save(); renderFamily(); renderRulesScopeSelects(); renderSettings(); renderAll();
+};
+document.getElementById('inviteAdult').onclick = ()=> inviteViaTelegram('adult');
+document.getElementById('inviteChild').onclick = ()=> inviteViaTelegram('child');
+
+function inviteViaTelegram(role){
+  // В реале: запрос к серверу -> получить токен и family_id
+  const token = (crypto.randomUUID?.()||String(Date.now()+Math.random())).slice(0,8);
+  const bot = 'pocket_kids_bot'; // замени своим
+  const deepLink = `https://t.me/${bot}?start=join_${role}_${token}`;
+  const text = role==='adult' ? 'Присоединяйся как взрослый к нашей семье в Pocket Kids' : 'Присоединяйся как ребёнок к нашей семье в Pocket Kids';
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(text)}`;
+  if (window.Telegram?.WebApp?.openTelegramLink) {
+    window.Telegram.WebApp.openTelegramLink(shareUrl);
+  } else {
+    alert('Скопируй ссылку и отправь в Телеграм: ' + deepLink);
+  }
+}
+
+// Render family lists
+function renderFamily(){
+  const A=document.getElementById('adultsList'); A.innerHTML='';
+  (S.family.adults||[]).forEach(a=>{
+    const div=document.createElement('div'); div.className='item';
+    div.innerHTML=`<div>${a.name}</div>
+    <div class="row"><button class="btn btn-s">Переименовать</button><button class="btn btn-o">Удалить</button></div>`;
+    const [edit,del] = div.querySelectorAll('button');
+    edit.onclick = ()=>{ const n=prompt('Новое имя',a.name); if(!n) return; a.name=n; save(); renderFamily(); };
+    del.onclick = ()=>{ S.family.adults=S.family.adults.filter(x=>x.id!==a.id); save(); renderFamily(); };
+    A.appendChild(div);
+  });
+  const K=document.getElementById('kidsList'); K.innerHTML='';
+  (S.family.kids||[]).forEach(k=>{
+    const div=document.createElement('div'); div.className='item';
+    div.innerHTML=`<div>${k.name}</div>
+    <div class="row"><button class="btn btn-s">Переименовать</button><button class="btn btn-o">Удалить</button></div>`;
+    const [edit,del] = div.querySelectorAll('button');
+    edit.onclick = ()=>{ const n=prompt('Новое имя',k.name); if(!n) return; k.name=n; save(); renderFamily(); renderSettings(); renderAll(); };
+    del.onclick = ()=>{
+      if(!confirm('Удалить ребёнка и связанные события?')) return;
+      S.family.kids=S.family.kids.filter(x=>x.id!==k.id);
+      S.events=S.events.filter(e=>e.kidId!==k.id);
+      if(S.settings.asChild===k.id) S.settings.asChild = S.family.kids[0]?.id || null;
+      save(); renderFamily(); renderRulesScopeSelects(); renderSettings(); renderAll();
+    };
+    K.appendChild(div);
+  });
+}
+
+// Rules
+function renderRulesScopeSelects(){
+  const sel = document.getElementById('ruleScope'); sel.innerHTML='';
+  const optAll = document.createElement('option'); optAll.value='all'; optAll.textContent='Для всех детей'; sel.appendChild(optAll);
+  (S.family.kids||[]).forEach(k=>{
+    const o=document.createElement('option'); o.value=k.id; o.textContent=`Только: ${k.name}`; sel.appendChild(o);
+  });
+}
+document.getElementById('createRule').onclick = ()=>{
+  if(S.settings.myRole!=='adult'){ alert('Правила может создавать только взрослый'); return; }
+  const type = document.getElementById('ruleType').value;
+  const title = document.getElementById('ruleTitle').value.trim(); if(!title){ alert('Название правила'); return; }
+  const amountRaw = Number(document.getElementById('ruleAmount').value||0); if(!amountRaw){ alert('Сумма правила'); return; }
+  const amount = type==='minus' ? -Math.abs(amountRaw) : Math.abs(amountRaw);
+  const scope = document.getElementById('ruleScope').value;
+  const rule = { id: crypto.randomUUID?.()||String(Date.now()+Math.random()), title, type, amount, scope };
+  S.rules.push(rule); save(); document.getElementById('ruleTitle').value=''; document.getElementById('ruleAmount').value=''; renderRules();
+};
+function renderRules(){
+  const L=document.getElementById('rulesList'); L.innerHTML='';
+  if(S.rules.length===0){ L.innerHTML='<div class="muted">Правил пока нет</div>'; return; }
+  S.rules.forEach(r=>{
+    const who = r.scope==='all' ? 'Все дети' : ('Только: ' + (S.family.kids.find(k=>k.id===r.scope)?.name||'—'));
+    const div=document.createElement('div'); div.className='item';
+    div.innerHTML=`<div><b>${r.title}</b> <span class="tag">${r.amount>0?'+':''}${r.amount} • ${who}</span></div>
+    <div class="row">
+      <button class="btn btn-s">Изменить</button>
+      <button class="btn btn-o">Удалить</button>
+    </div>`;
+    const [edit,del] = div.querySelectorAll('button');
+    edit.onclick = ()=>{
+      if(S.settings.myRole!=='adult'){ alert('Редактировать может только взрослый'); return; }
+      const newTitle = prompt('Название', r.title) ?? r.title;
+      const newAmount = prompt('Сумма (без знака)', Math.abs(r.amount));
+      if(newAmount===null) return;
+      const sign = r.amount>=0 ? 1 : -1;
+      const parsed = Number(newAmount||0); if(!parsed) return;
+      r.title = newTitle.trim()||r.title;
+      r.amount = sign * Math.abs(parsed);
+      save(); renderRules(); renderAll();
+    };
+    del.onclick = ()=>{
+      if(S.settings.myRole!=='adult'){ alert('Удалять может только взрослый'); return; }
+      if(!confirm('Удалить правило?')) return;
+      S.rules=S.rules.filter(x=>x.id!==r.id); save(); renderRules(); renderAll();
+    };
+    L.appendChild(div);
+  });
+}
+
+// Home
+function applicableRulesForKid(kidId){ return S.rules.filter(r => r.scope==='all' || r.scope===kidId); }
+function renderHome(){
+  const role = S.settings.myRole==='child'?'Ребёнок':'Взрослый';
+  document.getElementById('roleChip').textContent = role;
+  document.getElementById('childHint').style.display = (S.settings.myRole==='child') ? '' : 'none';
+  document.getElementById('periodChip').textContent = S.settings.period==='week'?'Неделя':'Месяц';
+  document.getElementById('startChip').textContent = S.settings.startAmount||0;
+  document.getElementById('currChip').textContent = S.settings.currency||'MXN';
+  const pr = periodRange(new Date()); document.getElementById('periodEnd').textContent = pr.end.toLocaleString();
+
+  const grid=document.getElementById('childrenCards'); grid.innerHTML='';
+  // Если роль ребёнок — показываем только выбранного ребёнка (asChild)
+  let kids = (S.family.kids||[]);
+  if(S.settings.myRole==='child'){ kids = kids.filter(k => k.id===S.settings.asChild); }
+  if(kids.length===0){
+    const card=document.createElement('div'); card.className='card'; card.innerHTML='<div class="muted">Нет детей для отображения</div>';
+    grid.appendChild(card); return;
+  }
+  kids.forEach(k=>{
+    const b = balanceFor(k.id);
+    const card = document.createElement('div'); card.className='card';
+    const rules = applicableRulesForKid(k.id);
+    card.innerHTML = `<div class="row" style="justify-content:space-between;">
+      <div>
+        <div><b>${k.name}</b></div>
+        <div class="tag">Баланс: <b id="bal-${k.id}">${b}</b> ${S.settings.currency||'MXN'}</div>
+      </div>
+      <div class="row">
+        <button class="btn btn-g qplus">+10</button>
+        <button class="btn btn-o qminus">-10</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid three" id="r-${k.id}"></div>
+    <div class="divider"></div>
+    <div class="muted" style="font-size:13px;">Последние события:</div>
+    <div id="feed-${k.id}" class="list"></div>`;
+    grid.appendChild(card);
+
+    const plusBtn = card.querySelector('.qplus');
+    const minusBtn = card.querySelector('.qminus');
+    if(S.settings.myRole==='child'){
+      plusBtn.classList.add('btn-disabled');
+      minusBtn.classList.add('btn-disabled');
+    } else {
+      plusBtn.onclick = ()=> addEvent(k.id, {title:'Поощрение', amount:+10});
+      minusBtn.onclick = ()=> addEvent(k.id, {title:'Наказание', amount:-10});
+    }
+
+    const rwrap = card.querySelector(`#r-${k.id}`);
+    if(rules.length===0){ rwrap.innerHTML='<div class="muted">Нет правил для этого ребёнка</div>'; }
+    rules.forEach(r=>{
+      const bttn=document.createElement('button');
+      bttn.className='btn btn-s';
+      if(S.settings.myRole==='child') bttn.classList.add('btn-disabled');
+      bttn.textContent = `${r.title} ${r.amount>0?'+':''}${r.amount}`;
+      if(S.settings.myRole!=='child'){
+        bttn.onclick = ()=> addEvent(k.id, {ruleId:r.id, title:r.title, amount:r.amount});
+      }
+      rwrap.appendChild(bttn);
+    });
+    renderFeed(k.id);
+  });
+
+  // нижние кнопки: только для взрослых
+  document.getElementById('closePeriodBtn').style.display = (S.settings.myRole==='child') ? 'none' : '';
+  document.getElementById('resetPeriodBtn').style.display = (S.settings.myRole==='child') ? 'none' : '';
+}
+function addEvent(kidId, {ruleId, title, amount}){
+  if(S.settings.myRole==='child'){ return; }
+  S.events.push({ id: crypto.randomUUID?.()||String(Date.now()+Math.random()), kidId, ruleId:ruleId||null, title, amount, ts:new Date().toISOString() });
+  save();
+  const el=document.getElementById(`bal-${kidId}`); if(el) el.textContent=balanceFor(kidId);
+  renderHistory();
+}
+function renderFeed(kidId){
+  const node=document.getElementById(`feed-${kidId}`);
+  const list = eventsThisPeriod(kidId).slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts)).slice(0,6);
+  node.innerHTML='';
+  if(list.length===0){ node.innerHTML='<div class="muted">Пусто</div>'; return; }
+  list.forEach(e=>{
+    const div=document.createElement('div'); div.className='item';
+    div.innerHTML = `<div class="row"><div class="chip">${new Date(e.ts).toLocaleString()}</div><div>${e.title}</div></div>
+    <b>${e.amount>0?'+':''}${e.amount}</b>`;
+    node.appendChild(div);
+  });
+}
+
+// Period actions (adults only)
+document.getElementById('closePeriodBtn').onclick = ()=>{
+  if(S.settings.myRole==='child') return;
+  const {start,end} = periodRange(new Date());
+  (S.family.kids||[]).forEach(k=>{
+    const amount=balanceFor(k.id);
+    S.payouts.push({ id: crypto.randomUUID?.()||String(Date.now()+Math.random()), periodStartISO:start.toISOString(), periodEndISO:end.toISOString(), kidId:k.id, amount, ts:new Date().toISOString() });
+  });
+  S.events = S.events.filter(e => new Date(e.ts) > end);
+  save(); renderAll(); alert('Период закрыт. Выплаты записаны в историю.');
+};
+document.getElementById('resetPeriodBtn').onclick = ()=>{
+  if(S.settings.myRole==='child') return;
+  const {start,end} = periodRange(new Date());
+  S.events = S.events.filter(e => !(new Date(e.ts)>=start && new Date(e.ts)<=end));
+  save(); renderAll();
+};
+
+// History
+function renderHistory(){
+  const E=document.getElementById('eventsList'); E.innerHTML='';
+  const events=S.events.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  if(events.length===0){ E.innerHTML='<div class="muted">Событий нет</div>'; } else {
+    events.forEach(e=>{
+      const kid=S.family.kids.find(k=>k.id===e.kidId);
+      const div=document.createElement('div'); div.className='item';
+      div.innerHTML=`<div><div class="tag">${new Date(e.ts).toLocaleString()}</div><div><b>${kid?.name||'Ребёнок'}</b> — ${e.title}</div></div><b>${e.amount>0?'+':''}${e.amount}</b>`;
+      E.appendChild(div);
+    });
+  }
+  const P=document.getElementById('payoutsList'); P.innerHTML='';
+  const payouts=S.payouts.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  if(payouts.length===0){ P.innerHTML='<div class="muted">Выплат пока нет</div>'; } else {
+    payouts.forEach(p=>{
+      const kid=S.family.kids.find(k=>k.id===p.kidId);
+      const div=document.createElement('div'); div.className='item';
+      div.innerHTML=`<div><div class="tag">${new Date(p.ts).toLocaleString()}</div><div><b>${kid?.name||'Ребёнок'}</b> • ${new Date(p.periodStartISO).toLocaleDateString()}–${new Date(p.periodEndISO).toLocaleDateString()}</div></div><b>${p.amount} ${S.settings.currency}</b>`;
+      P.appendChild(div);
+    });
+  }
+}
+
+// Settings
+document.getElementById('saveSettings').onclick = ()=>{
+  S.settings.startAmount = Number(document.getElementById('startAmount').value||S.settings.startAmount||200);
+  S.settings.period = document.getElementById('period').value||S.settings.period||'week';
+  S.settings.currency = document.getElementById('currency').value||S.settings.currency||'MXN';
+  S.settings.myRole = document.getElementById('myRole').value||'adult';
+  S.settings.asChild = document.getElementById('asChild').value||S.settings.asChild||null;
+  save(); renderAll(); alert('Сохранено');
+};
+function renderSettings(){
+  document.getElementById('startAmount').value = S.settings.startAmount||200;
+  document.getElementById('period').value = S.settings.period||'week';
+  document.getElementById('currency').value = S.settings.currency||'MXN';
+  document.getElementById('myRole').value = S.settings.myRole||'adult';
+  const asChildSel = document.getElementById('asChild'); asChildSel.innerHTML='';
+  (S.family.kids||[]).forEach(k=>{
+    const o=document.createElement('option'); o.value=k.id; o.textContent=k.name; asChildSel.appendChild(o);
+  });
+  if(S.family.kids.length===0){ document.getElementById('asChildWrap').style.display='none'; }
+  else { document.getElementById('asChildWrap').style.display=''; }
+  if(S.settings.asChild){ asChildSel.value=S.settings.asChild; }
+}
+
+// Init
+function renderAll(){ renderFamily(); renderRulesScopeSelects(); renderRules(); renderHome(); renderHistory(); renderSettings(); }
+renderAll();
+</script>
+</body>
+</html>
