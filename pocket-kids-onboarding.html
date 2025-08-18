@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pocket Kids — Onboarding</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0f1223;
+    --card:#151836;
+    --muted:#aab1d6;
+    --accent:#7c9cff;
+    --good:#42d392;
+    --bad:#ff6b6b;
+    --pad:16px;
+    --br:18px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; font-family: ui-rounded, system-ui, -apple-system, "SF Pro Rounded", Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #283065 0%, transparent 60%), var(--bg);
+    color:#e7ebff;
+  }
+  header{
+    position:sticky; top:0; z-index:10;
+    padding:12px var(--pad);
+    display:flex; align-items:center; justify-content:space-between;
+    background: linear-gradient(180deg, rgba(10,12,24,.9), rgba(10,12,24,.4));
+    backdrop-filter: blur(8px);
+  }
+  h1{ margin:0; font-size:20px; letter-spacing:.3px; }
+  .wrap{ padding: var(--pad); max-width:920px; margin: 0 auto; }
+  .card{
+    background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0));
+    border:1px solid rgba(255,255,255,.08);
+    border-radius: var(--br);
+    padding: var(--pad);
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .grid{ display:grid; gap:12px; }
+  .two{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .three{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+  @media (max-width: 640px){ .two,.three{ grid-template-columns: 1fr; } }
+  .btn{
+    padding:10px 14px; border-radius:12px; border:0; cursor:pointer;
+    background:#1b224f; color:#e7ebff;
+  }
+  .btn-ac{ background: var(--accent); color:#0a0d1f; font-weight:700; }
+  .btn-good{ background: var(--good); color:#061a0f; font-weight:700; }
+  .btn-bad{ background: var(--bad); color:#2a0e0e; font-weight:700; }
+  .btn-ghost{ background: transparent; border:1px solid rgba(255,255,255,.15); }
+  input, select, textarea{
+    padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.15); background: #0f1434;
+    color:#e7ebff; min-width:0;
+  }
+  .chip{ padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.15); background:#0f1434; color:#cbd5ff; font-size:12px; }
+  .muted{ color:var(--muted); }
+  .kidcard{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.0));
+    border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px;
+  }
+  .avatar{ width:52px; height:52px; border-radius:14px; display:grid; place-items:center; background:#1b224f; border:1px solid rgba(255,255,255,.12); overflow:hidden; }
+  .rulebtn{ padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#13183a; }
+  .rulebtn.good{ border-color:rgba(66,211,146,.5); }
+  .rulebtn.bad{ border-color:rgba(255,107,107,.5); }
+  .feeditem{ display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px dashed rgba(255,255,255,.1); border-radius:12px; }
+  .fab{
+    width:42px; height:42px; display:grid; place-items:center; border-radius:999px; border:1px solid rgba(255,255,255,.2);
+    background: linear-gradient(180deg, #2a3374, #1a1f4e); cursor:pointer;
+  }
+  .modal{ position:fixed; inset:0; display:none; place-items:center; padding:16px; background:rgba(0,0,0,.5); z-index:50; }
+  .ob{ max-width:900px; width:100%; }
+  .step{ display:none; }
+  .step.active{ display:block; }
+  .avatars{ display:grid; grid-template-columns: repeat(auto-fill, minmax(76px,1fr)); gap:10px; }
+  .avpick{ padding:8px; border:1px solid rgba(255,255,255,.12); border-radius:12px; cursor:pointer; background:#10143a; display:grid; gap:6px; place-items:center; }
+  .avpick.active{ outline:2px solid var(--accent); }
+  .title{ font-weight:800; letter-spacing:.3px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="title">Pocket Kids</div>
+    <div class="chip" id="hello">Загрузка…</div>
+  </div>
+  <div class="fab" id="openSettings" title="Настройки">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path stroke="#cbd5ff" stroke-width="2" d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.66 3a8.04 8.04 0 00-.32-1l1.84-1.34-1.5-2.6-2.18.6a7.96 7.96 0 00-1.72-1l-.33-2.27h-3l-.33 2.27a7.96 7.96 0 00-1.72 1l-2.18-.6-1.5 2.6 1.84 1.34c-.11.33-.23.66-.32 1l-2.18.66v3l2.18.66c.09.34.2.67.32 1l-1.84 1.34 1.5 2.6 2.18-.6c.53.39 1.12.73 1.72 1l.33 2.27h3l.33-2.27c.6-.27 1.19-.61 1.72-1l2.18.6 1.5-2.6-1.84-1.34c.12-.33.23-.66.32-1l2.18-.66v-3l-2.18-.66z"/></svg>
+  </div>
+</header>
+
+<div class="wrap grid">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div><b>Дети</b> <span class="muted">(баланс = старт + события)</span></div>
+      <div class="row">
+        <button class="btn btn-ac" id="addQuickChild">Добавить ребёнка</button>
+        <button class="btn btn-ghost" id="addQuickRule">Добавить правило</button>
+      </div>
+    </div>
+    <div id="kidsGrid" class="grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div><b>Быстрые действия</b></div>
+      <div class="row"><span class="chip">Всего правил: <b id="rulesCount">0</b></span></div>
+    </div>
+    <div id="actionsGrid" class="grid two"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div><b>Лента</b> <span class="muted">последние операции</span></div>
+      <div class="row">
+        <button class="btn" id="resetPeriod">Сбросить период</button>
+      </div>
+    </div>
+    <div id="feedAll" class="grid"></div>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="ob card">
+    <div class="row" style="justify-content:space-between;">
+      <h2 style="margin:0;">Настройки</h2>
+      <button class="btn" id="closeSettings">Закрыть</button>
+    </div>
+    <div class="grid two" style="margin-top:10px;">
+      <div>
+        <h3>Дети</h3>
+        <div class="row">
+          <input id="chName" placeholder="Имя" />
+          <input id="chStart" type="number" placeholder="Старт" />
+          <button class="btn btn-ac" id="chAdd">Добавить</button>
+        </div>
+        <div id="chList" class="grid"></div>
+      </div>
+      <div>
+        <h3>Правила</h3>
+        <div class="grid">
+          <div class="row">
+            <select id="rType">
+              <option value="plus">Награда (+)</option>
+              <option value="minus">Наказание (−)</option>
+            </select>
+            <input id="rTitle" placeholder="Название (Чтение)" />
+            <input id="rAmount" type="number" placeholder="Сумма (10)" />
+          </div>
+          <div class="row">
+            <select id="rScope">
+              <option value="all">Для всех</option>
+            </select>
+            <button class="btn btn-ac" id="rAdd">Добавить правило</button>
+          </div>
+        </div>
+        <div id="rList" class="grid" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="onboarding">
+  <div class="ob card">
+    <div id="steps">
+      <div class="step" data-step="1">
+        <h2 style="margin-top:0;">Шаг 1 — дети</h2>
+        <div class="muted">Добавь имя, стартовую сумму и выбери аватар (весёлые монстрики).</div>
+        <div class="grid two" style="margin-top:10px;">
+          <div class="grid">
+            <div class="row">
+              <input id="obName" placeholder="Имя ребёнка" />
+              <input id="obStart" type="number" placeholder="Старт (напр. 200)" />
+            </div>
+            <div>
+              <div class="muted" style="margin-bottom:6px;">Аватар</div>
+              <div id="obAvatars" class="avatars"></div>
+            </div>
+            <div class="row">
+              <button class="btn btn-ac" id="obAddKid">Добавить ребёнка</button>
+            </div>
+          </div>
+          <div>
+            <div class="muted">Список</div>
+            <div id="obKidsList" class="grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="2">
+        <h2 style="margin-top:0;">Шаг 2 — правила</h2>
+        <div class="grid">
+          <div class="row">
+            <select id="obType">
+              <option value="plus">Награда (+)</option>
+              <option value="minus">Наказание (−)</option>
+            </select>
+            <input id="obTitle" placeholder="Название (Чтение)" />
+            <input id="obAmount" type="number" placeholder="Сумма (10)" />
+          </div>
+          <div class="row">
+            <select id="obScope">
+              <option value="all">Для всех детей</option>
+            </select>
+            <button class="btn btn-ac" id="obAddRule">Добавить правило</button>
+          </div>
+        </div>
+        <div id="obRulesList" class="grid" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:flex-end; margin-top:16px;">
+      <button class="btn" id="obPrev">Назад</button>
+      <button class="btn btn-good" id="obNext">Дальше</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp; if (tg){ tg.ready(); tg.expand(); }
+const hello = document.getElementById('hello');
+hello.textContent = tg?.initDataUnsafe?.user?.first_name ? `Привет, ${tg.initDataUnsafe.user.first_name}!` : 'Привет!';
+
+const LS = 'pk-onb';
+let S = load() ?? { kids:[], rules:[], events:[] };
+function save(){ localStorage.setItem(LS, JSON.stringify(S)); }
+function load(){ try{ return JSON.parse(localStorage.getItem(LS)); }catch(e){ return null; } }
+
+const MONSTERS = Array.from({length:8}).map((_,i)=>{
+  const colors = ['#8b5cf6','#f59e0b','#10b981','#60a5fa','#ef4444','#eab308','#22d3ee','#f472b6'];
+  const c = colors[i%colors.length];
+  return `<svg width="56" height="56" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <rect rx="14" width="64" height="64" fill="${c}"/>
+    <circle cx="24" cy="28" r="6" fill="#fff"/><circle cx="40" cy="28" r="6" fill="#fff"/>
+    <circle cx="24" cy="28" r="2.5" fill="#111"/><circle cx="40" cy="28" r="2.5" fill="#111"/>
+    <rect x="18" y="40" width="28" height="6" rx="3" fill="#111"/>
+    <rect x="20" y="8" width="8" height="10" rx="3" fill="#fff" opacity=".7"/>
+    <rect x="36" y="8" width="8" height="10" rx="3" fill="#fff" opacity=".7"/>
+  </svg>`;
+});
+function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+function uuid(){ return (crypto.randomUUID?.()||String(Date.now()+Math.random())); }
+function eventsFor(kidId){ return S.events.filter(e=> e.kidId===kidId); }
+function balanceFor(kidId){
+  const kid = S.kids.find(k=>k.id===kidId); const base = Number(kid?.start||0);
+  const delta = eventsFor(kidId).reduce((a,e)=>a+Number(e.amount||0),0);
+  return base + delta;
+}
+
+function render(){
+  const kg = document.getElementById('kidsGrid'); kg.innerHTML='';
+  if(S.kids.length===0){ kg.innerHTML = '<div class="muted">Пока нет детей — добавь первого.</div>'; }
+  S.kids.forEach(k=>{
+    const card = el(`<div class="kidcard">
+      <div class="row">
+        <div class="avatar">${MONSTERS[k.avatar||0]}</div>
+        <div>
+          <div style="font-weight:700;">${k.name}</div>
+          <div class="muted" style="font-size:12px;">Баланс: <b id="bal-${k.id}">${balanceFor(k.id)}</b></div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-good" data-k="${k.id}" data-a="10">+10</button>
+        <button class="btn btn-bad" data-k="${k.id}" data-a="-10">-10</button>
+      </div>
+    </div>`);
+    kg.appendChild(card);
+  });
+  kg.querySelectorAll('button[data-k]').forEach(b=>{
+    b.onclick = ()=>{
+      const kidId = b.getAttribute('data-k'); const a = Number(b.getAttribute('data-a'));
+      addEvent(kidId, { title: a>0?'Поощрение':'Штраф', amount:a });
+    };
+  });
+
+  const ag = document.getElementById('actionsGrid'); ag.innerHTML='';
+  document.getElementById('rulesCount').textContent = S.rules.length;
+  S.kids.forEach(k=>{
+    const cell = el(`<div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="row"><div class="avatar" style="width:40px;height:40px;">${MONSTERS[k.avatar||0]}</div><div><b>${k.name}</b></div></div>
+        <div class="chip">Баланс: <b id="bb-${k.id}">${balanceFor(k.id)}</b></div>
+      </div>
+      <div class="grid three" id="rules-${k.id}" style="margin-top:10px;"></div>
+    </div>`);
+    ag.appendChild(cell);
+    const rw = cell.querySelector(`#rules-${k.id}`);
+    const rules = S.rules.filter(r => r.scope==='all' || r.scope===k.id);
+    if(rules.length===0) rw.innerHTML = '<div class="muted">Нет правил</div>';
+    rules.forEach(r=>{
+      const btn = el(`<button class="rulebtn ${r.type==='plus'?'good':'bad'}">${r.title} ${r.amount>0?'+':''}${r.amount}</button>`);
+      btn.onclick = ()=> addEvent(k.id, { ruleId:r.id, title:r.title, amount:r.amount });
+      rw.appendChild(btn);
+    });
+  });
+
+  const f = document.getElementById('feedAll'); f.innerHTML='';
+  const list = S.events.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts)).slice(0,15);
+  if(list.length===0) f.innerHTML = '<div class="muted">Пока пусто</div>';
+  list.forEach(e=>{
+    const kid = S.kids.find(k=>k.id===e.kidId);
+    const row = el(`<div class="feeditem">
+      <div class="row"><div class="avatar" style="width:34px;height:34px;">${MONSTERS[kid?.avatar||0]}</div>
+      <div><b>${kid?.name||'—'}</b> — ${e.title}<div class="muted" style="font-size:12px;">${new Date(e.ts).toLocaleString()}</div></div></div>
+      <div style="font-weight:800; ${e.amount>0?'color:var(--good)':'color:var(--bad)'};">${e.amount>0?'+':''}${e.amount}</div>
+    </div>`);
+    f.appendChild(row);
+  });
+
+  renderSettings();
+}
+function addEvent(kidId, {title, amount, ruleId}){
+  S.events.push({ id: uuid(), kidId, title, amount, ruleId: ruleId||null, ts: new Date().toISOString() });
+  save(); render();
+}
+
+const settingsModal = document.getElementById('settingsModal');
+document.getElementById('openSettings').onclick = ()=>{ settingsModal.style.display='grid'; renderSettings(); };
+document.getElementById('closeSettings').onclick = ()=>{ settingsModal.style.display='none'; };
+
+function renderSettings(){
+  const list = document.getElementById('chList'); list.innerHTML='';
+  S.kids.forEach(k=>{
+    const row = el(`<div class="kidcard">
+      <div class="row"><div class="avatar">${MONSTERS[k.avatar||0]}</div><div><b>${k.name}</b><div class="muted" style="font-size:12px;">Старт: ${k.start}</div></div></div>
+      <div class="row">
+        <button class="btn" data-edit="${k.id}">Изм.</button>
+        <button class="btn btn-bad" data-del="${k.id}">Удалить</button>
+      </div>
+    </div>`);
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick = ()=>{ const id=b.getAttribute('data-del'); S.kids = S.kids.filter(x=>x.id!==id); S.events = S.events.filter(e=>e.kidId!==id); save(); render(); };
+  });
+  list.querySelectorAll('button[data-edit]').forEach(b=>{
+    b.onclick = ()=>{
+      const id=b.getAttribute('data-edit'); const kid=S.kids.find(x=>x.id===id);
+      const n = prompt('Имя', kid.name); if(n===null) return;
+      const s = prompt('Стартовая сумма', kid.start); if(s===null) return;
+      kid.name = n.trim()||kid.name; kid.start = Number(s)||kid.start; save(); render();
+    };
+  });
+
+  const scopeSel = document.getElementById('rScope'); scopeSel.innerHTML='<option value="all">Для всех</option>';
+  S.kids.forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent='Только: '+k.name; scopeSel.appendChild(o); });
+
+  const rList = document.getElementById('rList'); rList.innerHTML='';
+  S.rules.forEach(r=>{
+    const who = (r.scope==='all') ? 'Все дети' : ('Только: '+(S.kids.find(k=>k.id===r.scope)?.name||'—'));
+    const row = el(`<div class="kidcard">
+      <div><b>${r.title}</b> <span class="muted"> ${r.amount>0?'+':''}${r.amount} • ${who}</span></div>
+      <div class="row">
+        <button class="btn" data-red="${r.id}">Изм.</button>
+        <button class="btn btn-bad" data-rdel="${r.id}">Удалить</button>
+      </div>
+    </div>`);
+    rList.appendChild(row);
+  });
+  rList.querySelectorAll('button[data-rdel]').forEach(b=>{
+    b.onclick = ()=>{ const id=b.getAttribute('data-rdel'); S.rules = S.rules.filter(x=>x.id!==id); save(); render(); };
+  });
+  rList.querySelectorAll('button[data-red]').forEach(b=>{
+    b.onclick = ()=>{
+      const id=b.getAttribute('data-red'); const r=S.rules.find(x=>x.id===id);
+      const t = prompt('Название', r.title); if(t===null) return;
+      const a = prompt('Сумма (без знака)', Math.abs(r.amount)); if(a===null) return;
+      const sign = r.amount>=0 ? 1 : -1; const num = Number(a)||Math.abs(r.amount);
+      r.title = (t.trim()||r.title); r.amount = sign*Math.abs(num); save(); render();
+    };
+  });
+}
+
+document.getElementById('chAdd').onclick = ()=>{
+  const name = document.getElementById('chName').value.trim();
+  const start = Number(document.getElementById('chStart').value||0);
+  if(!name){ alert('Имя'); return; }
+  const id = uuid(); S.kids.push({ id, name, start, avatar: 0 });
+  document.getElementById('chName').value=''; document.getElementById('chStart').value='';
+  save(); render();
+};
+document.getElementById('rAdd').onclick = ()=>{
+  const type = document.getElementById('rType').value;
+  const title = document.getElementById('rTitle').value.trim();
+  const amountRaw = Number(document.getElementById('rAmount').value||0);
+  const scope = document.getElementById('rScope').value;
+  if(!title || !amountRaw){ alert('Заполни название и сумму'); return; }
+  const rule = { id: uuid(), title, type, amount: (type==='minus'?-Math.abs(amountRaw):Math.abs(amountRaw)), scope };
+  S.rules.push(rule);
+  document.getElementById('rTitle').value=''; document.getElementById('rAmount').value='';
+  save(); render();
+};
+
+document.getElementById('addQuickChild').onclick = ()=>{ document.getElementById('openSettings').click(); document.getElementById('chName').focus(); };
+document.getElementById('addQuickRule').onclick = ()=>{ document.getElementById('openSettings').click(); document.getElementById('rTitle').focus(); };
+
+document.getElementById('resetPeriod').onclick = ()=>{
+  if(!confirm('Сбросить текущий период? Это удалит все события.')) return;
+  S.events = []; save(); render();
+};
+
+const ob = document.getElementById('onboarding');
+const steps = Array.from(document.querySelectorAll('.step'));
+let idx = 0;
+function showStep(i){ steps.forEach((s,j)=> s.classList.toggle('active', j===i)); document.getElementById('obPrev').style.display = (i===0?'none':''); document.getElementById('obNext').textContent = (i===steps.length-1?'Готово':'Дальше'); }
+function ensureOnboarding(){
+  if((S.kids?.length||0)===0){
+    ob.style.display='grid'; idx=0; showStep(idx); renderObAvatars(); renderObKids(); renderObScope();
+  }
+}
+function renderObAvatars(){
+  const box = document.getElementById('obAvatars'); box.innerHTML='';
+  MONSTERS.forEach((svg,i)=>{
+    const d = el(`<div class="avpick">${svg}</div>`);
+    d.onclick = ()=>{ document.querySelectorAll('.avpick').forEach(x=>x.classList.remove('active')); d.classList.add('active'); d.dataset.idx=i; };
+    if(i===0) d.classList.add('active');
+    box.appendChild(d);
+  });
+}
+function renderObKids(){
+  const list = document.getElementById('obKidsList'); list.innerHTML='';
+  S.kids.forEach(k=>{
+    const row = el(`<div class="kidcard"><div class="row"><div class="avatar">${MONSTERS[k.avatar||0]}</div><div><b>${k.name}</b><div class="muted" style="font-size:12px;">Старт: ${k.start}</div></div></div><button class="btn btn-bad" data-del="${k.id}">Удалить</button></div>`);
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick = ()=>{ const id=b.getAttribute('data-del'); S.kids=S.kids.filter(x=>x.id!==id); save(); renderObKids(); renderObScope(); };
+  });
+}
+function renderObScope(){
+  const sel = document.getElementById('obScope'); sel.innerHTML='<option value="all">Для всех детей</option>';
+  S.kids.forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent='Только: '+k.name; sel.appendChild(o); });
+}
+document.getElementById('obAddKid').onclick = ()=>{
+  const name = document.getElementById('obName').value.trim(); const start = Number(document.getElementById('obStart').value||0);
+  if(!name){ alert('Имя'); return; }
+  const active = document.querySelector('.avpick.active'); const avatar = Number(active?.dataset.idx||0);
+  S.kids.push({ id: uuid(), name, start, avatar });
+  document.getElementById('obName').value=''; document.getElementById('obStart').value='';
+  save(); renderObKids(); renderObScope();
+};
+document.getElementById('obAddRule').onclick = ()=>{
+  const type = document.getElementById('obType').value;
+  const title = document.getElementById('obTitle').value.trim();
+  const amountRaw = Number(document.getElementById('obAmount').value||0);
+  const scope = document.getElementById('obScope').value;
+  if(!title || !amountRaw){ alert('Заполни название и сумму'); return; }
+  const rule = { id: uuid(), title, type, amount: (type==='minus'?-Math.abs(amountRaw):Math.abs(amountRaw)), scope };
+  S.rules.push(rule); save(); renderObRules();
+  document.getElementById('obTitle').value=''; document.getElementById('obAmount').value='';
+};
+function renderObRules(){
+  const box = document.getElementById('obRulesList'); box.innerHTML='';
+  if(S.rules.length===0){ box.innerHTML = '<div class="muted">Пока нет правил</div>'; return; }
+  S.rules.forEach(r=>{
+    const who = r.scope==='all' ? 'Все дети' : ('Только: '+(S.kids.find(k=>k.id===r.scope)?.name||'—'));
+    const row = el(`<div class="kidcard"><div><b>${r.title}</b> <span class="muted">${r.amount>0?'+':''}${r.amount} • ${who}</span></div><button class="btn btn-bad" data-del="${r.id}">Удалить</button></div>`);
+    row.querySelector('button').onclick = ()=>{ S.rules = S.rules.filter(x=>x.id!==r.id); save(); renderObRules(); };
+    box.appendChild(row);
+  });
+}
+document.getElementById('obPrev').onclick = ()=>{ if(idx>0){ idx--; showStep(idx); } };
+document.getElementById('obNext').onclick = ()=>{
+  if(idx===0){
+    if(S.kids.length===0){ alert('Добавь хотя бы одного ребёнка'); return; }
+    idx++; showStep(idx); renderObRules();
+  } else {
+    ob.style.display='none'; render(); save();
+  }
+};
+
+render();
+ensureOnboarding();
+</script>
+</body>
+</html>
