@@ -91,20 +91,21 @@
   inset: 0;
   display: none;
   place-items: center;
-  background: #0b0f2a;
+  background: #f5f5f5;   /* <-- светлый фон */
   z-index: 50;
-  overflow: auto;              /* <-- ключевое */
-  padding: 16px;               /* чтобы карточка не прилипала к краям */
+  overflow: auto;
+  padding: 16px;
 }
 
 /* Карточка-онбординг тоже скроллится внутри, если контента много */
 .ob-card{
   width: min(980px, 96vw);
-  max-height: 92vh;            /* <-- ограничиваем по высоте */
-  overflow: auto;              /* <-- и разрешаем скролл */
-  -webkit-overflow-scrolling: touch; /* плавный скролл на iOS */
-  background: var(--surface);
-  border: 1px solid rgba(255,255,255,.12);
+  max-height: 92vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #ffffff;   /* <-- белая карточка */
+  color: #222;           /* <-- тёмный текст */
+  border: 1px solid rgba(0,0,0,.12);
   border-radius: 24px;
   padding: 26px;
 }
