@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pocket Kids — v7</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0f1223;
+    --surface:#141735;
+    --surface2:#191d45;
+    --muted:#b6c0ff;
+    --accent:#7c9cff;
+    --good:#42d392;
+    --bad:#ff6b6b;
+    --pad:20px;
+    --br:20px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; font-family: ui-rounded, system-ui, -apple-system, "SF Pro Rounded", Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #283065 0%, transparent 60%), var(--bg);
+    color:#e7ebff;
+  }
+  header{
+    position:sticky; top:0; z-index:10;
+    padding:16px var(--pad);
+    display:flex; align-items:center; justify-content:space-between;
+    background: linear-gradient(180deg, #0b0e22, rgba(11,14,34,.6));
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  h1{ margin:0; font-size:22px; letter-spacing:.3px; }
+  .wrap{ padding: var(--pad); max-width:960px; margin: 0 auto; }
+  .card{
+    background: var(--surface);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius: var(--br);
+    padding: calc(var(--pad) * 1.1);
+    box-shadow: 0 16px 40px rgba(0,0,0,.35);
+  }
+  .row{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  .grid{ display:grid; gap:18px; }
+  .two{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .three{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+  @media (max-width: 740px){ .two,.three{ grid-template-columns: 1fr; } }
+  .btn{
+    padding:16px 20px; border-radius:16px; border:0; cursor:pointer;
+    background:#2a3476; color:#e7ebff; font-size:17px;
+  }
+  .btn-lg{ padding:18px 24px; font-weight:800; font-size:20px; }
+  .btn-ac{ background: var(--accent); color:#0a0d1f; font-weight:800; }
+  .btn-good{ background: var(--good); color:#061a0f; font-weight:800; }
+  .btn-bad{ background: var(--bad); color:#2a0e0e; font-weight:800; }
+  input, select, textarea{
+    padding:16px; border-radius:16px; border:1px solid rgba(255,255,255,.15); background: #10143a;
+    color:#e7ebff; min-width:0; font-size:16px; line-height:1.2;
+  }
+  /* Make selects same look as inputs */
+  select{
+    -webkit-appearance:none; -moz-appearance:none; appearance:none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path d="M5 7l5 6 5-6" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg>');
+    background-repeat:no-repeat; background-position: right 12px center; padding-right:38px;
+  }
+  .chip{ padding:10px 14px; border-radius:999px; border:1px solid rgba(255,255,255,.15); background:#0f1434; color:#cbd5ff; font-size:14px; }
+  .muted{ color:var(--muted); }
+  .kidcard{
+    display:flex; flex-direction:column; gap:16px;
+    background: var(--surface2);
+    border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:20px;
+  }
+  .kid-head{ display:flex; align-items:center; justify-content:space-between; gap:18px; }
+  .kid-left{ display:flex; align-items:center; gap:16px; }
+  .avatar{ width:88px; height:88px; border-radius:20px; display:flex; align-items:center; justify-content:center; background:#1b224f; border:1px solid rgba(255,255,255,.12); overflow:hidden; }
+  .name{ font-weight:900; font-size:20px; letter-spacing:.2px; }
+  .balance{ font-size:15px; opacity:.9; }
+  .rulebtn{ padding:14px; border-radius:14px; border:1px solid rgba(255,255,255,.12); background:#13183a; font-size:16px; }
+  .rulebtn.good{ border-color:rgba(66,211,146,.5); }
+  .rulebtn.bad{ border-color:rgba(255,107,107,.5); }
+  .feeditem{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border:1px dashed rgba(255,255,255,.12); border-radius:16px; background:#12173a; }
+  .page-tabs{ display:flex; gap:8px; }
+  .tab{ padding:12px 16px; border-radius:999px; background:#1a1f4e; border:1px solid rgba(255,255,255,.14); cursor:pointer; font-weight:700; }
+  .tab.active{ background:#e7ebff; color:#0b0f2a; }
+  .section-title{ font-size:20px; font-weight:900; margin-bottom:8px; }
+
+  /* Opaque onboarding */
+  .ob-wrap{ position:fixed; inset:0; display:none; place-items:center; background:#0b0f2a; z-index:50; }
+  .ob-card{ width: min(980px, 96vw); background: var(--surface); border:1px solid rgba(255,255,255,.12); border-radius:24px; padding:26px; }
+  .avatars{ display:grid; grid-template-columns: repeat(auto-fill, minmax(92px,1fr)); gap:14px; }
+  .avpick{ padding:12px; border:2px solid transparent; border-radius:18px; cursor:pointer; background:#10143a; display:flex; align-items:center; justify-content:center; }
+  .avpick.active{ border-color: var(--accent); background:#0f132e; }
+  .title{ font-weight:900; letter-spacing:.3px; }
+  .divider{ height:1px; background: rgba(255,255,255,.12); margin: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1 class="title">Мои дети</h1>
+    <span class="chip" id="hello">Загрузка…</span>
+  </div>
+  <div class="page-tabs">
+    <button class="tab active" data-page="home">Главная</button>
+    <button class="tab" data-page="settings">Настройки</button>
+  </div>
+</header>
+
+<main id="home" class="wrap grid" style="display:block;">
+  <div class="card">
+    <div class="section-title">Список детей</div>
+    <div id="kidsGrid" class="grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div class="section-title">Лента событий</div>
+      <button class="btn" id="resetPeriod">Сбросить период</button>
+    </div>
+    <div id="feedAll" class="grid"></div>
+  </div>
+</main>
+
+<main id="settings" class="wrap grid" style="display:none;">
+  <div class="card grid two">
+    <section>
+      <div class="section-title">Быстрые суммы</div>
+      <div class="row">
+        <label class="row" style="gap:12px;"><span class="chip">Награда</span> <input id="quickPlus" type="number" value="10" /></label>
+        <label class="row" style="gap:12px;"><span class="chip">Наказание</span> <input id="quickMinus" type="number" value="10" /></label>
+      </div>
+    </section>
+    <section>
+      <div class="section-title">Сброс</div>
+      <div class="row">
+        <button class="btn" id="resetEvents">Очистить события</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Дети</div>
+    <div class="grid two">
+      <div class="grid">
+        <div class="row">
+          <input id="chName" placeholder="Имя" />
+          <input id="chStart" type="number" placeholder="Старт (например 200)" />
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:10px;">Аватар</div>
+          <div id="chAvatars" class="avatars"></div>
+        </div>
+        <div class="row">
+          <button class="btn btn-ac" id="chAdd">Добавить ребёнка</button>
+        </div>
+      </div>
+      <div>
+        <div id="chList" class="grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Правила (дополнительные)</div>
+    <div class="grid two">
+      <div class="grid">
+        <div class="row">
+          <select id="rType">
+            <option value="plus">Награда (+)</option>
+            <option value="minus" selected>Наказание (−)</option>
+          </select>
+          <input id="rTitle" placeholder="Название (Чтение)" />
+          <input id="rAmount" type="number" value="10" />
+        </div>
+        <div class="row">
+          <select id="rScope">
+            <option value="all">Для всех</option>
+          </select>
+          <button class="btn btn-ac" id="rAdd">Добавить правило</button>
+        </div>
+      </div>
+      <div>
+        <div id="rList" class="grid"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ONBOARDING (opaque, list on top) -->
+<div class="ob-wrap" id="onboarding">
+  <div class="ob-card">
+    <div id="steps">
+      <div class="step" data-step="1">
+        <h2 style="margin-top:0;">Шаг 1 — дети</h2>
+        <div class="muted">Сначала добавленные дети (сверху), ниже — форма добавления.</div>
+        <div id="obKidsList" class="grid" style="margin-bottom:18px;"></div>
+        <div class="divider"></div>
+        <div class="grid">
+          <div class="row">
+            <input id="obName" placeholder="Имя ребёнка" />
+            <input id="obStart" type="number" placeholder="Старт (напр. 200)" />
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:10px;">Аватар</div>
+            <div id="obAvatars" class="avatars"></div>
+          </div>
+          <div class="row">
+            <button class="btn btn-ac" id="obAddKid">Добавить ребёнка</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="2">
+        <h2 style="margin-top:0;">Шаг 2 — быстрые суммы + правила</h2>
+        <div class="row">
+          <label class="row" style="gap:12px;"><span class="chip">Награда</span> <input id="obPlus" type="number" value="10" /></label>
+          <label class="row" style="gap:12px;"><span class="chip">Наказание</span> <input id="obMinus" type="number" value="10" /></label>
+        </div>
+        <div class="muted" style="margin:10px 0 8px;">Эти суммы будут на больших кнопках карточек.</div>
+        <div class="grid">
+          <div class="row">
+            <select id="obType">
+              <option value="plus">Награда (+)</option>
+              <option value="minus" selected>Наказание (−)</option>
+            </select>
+            <input id="obTitle" placeholder="Название (Чтение)" />
+            <input id="obAmount" type="number" value="10" />
+          </div>
+          <div class="row">
+            <select id="obScope">
+              <option value="all">Для всех детей</option>
+            </select>
+            <button class="btn" id="obAddRule">Добавить правило</button>
+          </div>
+          <div id="obRulesList" class="grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:flex-end; margin-top:18px;">
+      <button class="btn" id="obPrev">Назад</button>
+      <button class="btn btn-ac" id="obNext">Дальше</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Telegram init
+const tg = window.Telegram?.WebApp; if (tg){ tg.ready(); tg.expand(); }
+document.getElementById('hello').textContent = tg?.initDataUnsafe?.user?.first_name ? `Привет, ${tg.initDataUnsafe.user.first_name}!` : 'Привет!';
+
+// Paging
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t=> t.onclick = ()=> switchPage(t.dataset.page));
+function switchPage(id){
+  tabs.forEach(t=> t.classList.toggle('active', t.dataset.page===id));
+  document.getElementById('home').style.display = id==='home'?'block':'none';
+  document.getElementById('settings').style.display = id==='settings'?'block':'none';
+}
+
+// State
+const LS='pk-v7';
+let S = load() ?? { quick:{plus:10, minus:10}, kids:[], rules:[], events:[] };
+function save(){ localStorage.setItem(LS, JSON.stringify(S)); }
+function load(){ try{ return JSON.parse(localStorage.getItem(LS)); }catch(e){ return null; } }
+
+// Monsters — cute centered with curved smiles & blush
+const palette = ['#8b5cf6','#60a5fa','#10b981','#f59e0b','#ef4444','#22d3ee','#eab308','#f472b6','#a78bfa','#34d399'];
+function monsterSVG(idx){
+  const c = palette[idx % palette.length];
+  return `<svg width="88" height="88" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <rect x="6" y="8" width="52" height="48" rx="16" fill="${c}"/>
+    <circle cx="24" cy="28" r="6" fill="#fff"/><circle cx="40" cy="28" r="6" fill="#fff"/>
+    <circle cx="24" cy="28" r="2.6" fill="#111"/><circle cx="40" cy="28" r="2.6" fill="#111"/>
+    <!-- blush -->
+    <circle cx="18" cy="36" r="3" fill="#ffb4b4" opacity=".7"/><circle cx="46" cy="36" r="3" fill="#ffb4b4" opacity=".7"/>
+    <!-- curved smile -->
+    <path d="M22 42c4 4 16 4 20 0" stroke="#111" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- ears/antennas variants -->
+    <g fill="#fff" opacity=".75">
+      ${idx%3===0?'<rect x="18" y="6" width="6" height="8" rx="3"/><rect x="40" y="6" width="6" height="8" rx="3"/>':''}
+      ${idx%3===1?'<path d="M14 14l8 6h-8z"/><path d="M50 14l-8 6h8z"/>':''}
+      ${idx%3===2?'<circle cx="20" cy="10" r="3"/><circle cx="44" cy="10" r="3"/>':''}
+    </g>
+  </svg>`;
+}
+
+// Helpers
+function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+function uuid(){ return (crypto.randomUUID?.()||String(Date.now()+Math.random())); }
+function eventsFor(kidId){ return S.events.filter(e=> e.kidId===kidId); }
+function balanceFor(kidId){
+  const kid = S.kids.find(k=>k.id===kidId); const base = Number(kid?.start||0);
+  const delta = eventsFor(kidId).reduce((a,e)=>a+Number(e.amount||0),0);
+  return base + delta;
+}
+
+// Render Home
+function renderHome(){
+  const kg = document.getElementById('kidsGrid'); kg.innerHTML='';
+  if(S.kids.length===0){ kg.innerHTML = '<div class="muted">Пока нет детей — добавь в Настройках.</div>'; }
+  S.kids.forEach(k=>{
+    const card = el(`<div class="kidcard">
+      <div class="kid-head">
+        <div class="kid-left">
+          <div class="avatar">${monsterSVG(k.avatar||0)}</div>
+          <div>
+            <div class="name">${k.name}</div>
+            <div class="balance">Баланс: <b id="bal-${k.id}">${balanceFor(k.id)}</b></div>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn btn-good btn-lg" data-k="${k.id}" data-a="plus">+${S.quick.plus}</button>
+          <button class="btn btn-bad btn-lg" data-k="${k.id}" data-a="minus">−${S.quick.minus}</button>
+        </div>
+      </div>
+      <div id="rules-${k.id}" class="grid three"></div>
+    </div>`);
+    kg.appendChild(card);
+    // render per-child rule buttons
+    const rw = card.querySelector(`#rules-${k.id}`);
+    const rules = S.rules.filter(r => r.scope==='all' || r.scope===k.id);
+    if(rules.length===0){
+      rw.innerHTML = '<div class="muted">Нет дополнительных правил</div>';
+    }else{
+      rules.forEach(r=>{
+        const btn = el(`<button class="rulebtn ${r.type==='plus'?'good':'bad'}">${r.title} ${r.amount>0?'+':''}${r.amount}</button>`);
+        btn.onclick = ()=> addEvent(k.id, { title:r.title, amount:r.amount, ruleId:r.id });
+        rw.appendChild(btn);
+      });
+    }
+  });
+  // quick buttons
+  kg.querySelectorAll('button[data-k]').forEach(b=>{
+    b.onclick = ()=>{
+      const kidId = b.getAttribute('data-k'); const t = b.getAttribute('data-a');
+      const amt = t==='plus' ? Math.abs(Number(S.quick.plus||10)) : -Math.abs(Number(S.quick.minus||10));
+      addEvent(kidId, { title: t==='plus'?'Поощрение':'Штраф', amount:amt });
+    };
+  });
+
+  // feed
+  const f = document.getElementById('feedAll'); f.innerHTML='';
+  const list = S.events.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts)).slice(0,20);
+  if(list.length===0) f.innerHTML = '<div class="muted">Пока пусто</div>';
+  list.forEach(e=>{
+    const kid = S.kids.find(k=>k.id===e.kidId);
+    const row = el(`<div class="feeditem">
+      <div class="row"><div class="avatar" style="width:56px;height:56px;">${monsterSVG(kid?.avatar||0)}</div>
+      <div><b>${kid?.name||'—'}</b> — ${e.title}<div class="muted" style="font-size:12px;">${new Date(e.ts).toLocaleString()}</div></div></div>
+      <div style="font-weight:900; ${e.amount>0?'color:var(--good)':'color:var(--bad)'}; font-size:20px;">${e.amount>0?'+':''}${e.amount}</div>
+    </div>`);
+    f.appendChild(row);
+  });
+}
+
+// Render Settings
+function renderSettings(){
+  document.getElementById('quickPlus').value = S.quick.plus;
+  document.getElementById('quickMinus').value = S.quick.minus;
+
+  const scopeSel = document.getElementById('rScope'); scopeSel.innerHTML='<option value="all">Для всех</option>';
+  S.kids.forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent='Только: '+k.name; scopeSel.appendChild(o); });
+
+  const av = document.getElementById('chAvatars'); av.innerHTML='';
+  for(let i=0;i<10;i++){
+    const d = el(`<div class="avpick" data-idx="${i}">${monsterSVG(i)}</div>`);
+    if(i===0) d.classList.add('active');
+    d.onclick = ()=>{ av.querySelectorAll('.avpick').forEach(x=>x.classList.remove('active')); d.classList.add('active'); };
+    av.appendChild(d);
+  }
+
+  const list = document.getElementById('chList'); list.innerHTML='';
+  S.kids.forEach(k=>{
+    const row = el(`<div class="kidcard">
+      <div class="kid-head"><div class="kid-left"><div class="avatar">${monsterSVG(k.avatar||0)}</div><div><div class="name">${k.name}</div><div class="muted" style="font-size:13px;">Старт: ${k.start}</div></div></div>
+      <div class="row">
+        <button class="btn" data-edit="${k.id}">Изм.</button>
+        <button class="btn btn-bad" data-del="${k.id}">Удалить</button>
+      </div></div>`);
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick = ()=>{ const id=b.getAttribute('data-del'); S.kids=S.kids.filter(x=>x.id!==id); S.events=S.events.filter(e=>e.kidId!==id); save(); renderAll(); };
+  });
+  list.querySelectorAll('button[data-edit]').forEach(b=>{
+    b.onclick = ()=>{
+      const id=b.getAttribute('data-edit'); const kid=S.kids.find(x=>x.id===id);
+      const n = prompt('Имя', kid.name); if(n===null) return;
+      const s = prompt('Стартовая сумма', kid.start); if(s===null) return;
+      kid.name = n.trim()||kid.name; kid.start = Number(s)||kid.start; save(); renderAll();
+    };
+  });
+
+  const rList = document.getElementById('rList'); rList.innerHTML='';
+  S.rules.forEach(r=>{
+    const who = (r.scope==='all') ? 'Все дети' : ('Только: '+(S.kids.find(k=>k.id===r.scope)?.name||'—'));
+    const row = el(`<div class="kidcard">
+      <div><b>${r.title}</b> <span class="muted"> ${r.amount>0?'+':''}${r.amount} • ${who}</span></div>
+      <div class="row">
+        <button class="btn" data-red="${r.id}">Изм.</button>
+        <button class="btn btn-bad" data-rdel="${r.id}">Удалить</button>
+      </div>
+    </div>`);
+    rList.appendChild(row);
+  });
+  rList.querySelectorAll('button[data-rdel]').forEach(b=>{
+    b.onclick = ()=>{ const id=b.getAttribute('data-rdel'); S.rules=S.rules.filter(x=>x.id!==id); save(); renderAll(); };
+  });
+  rList.querySelectorAll('button[data-red]').forEach(b=>{
+    b.onclick = ()=>{
+      const id=b.getAttribute('data-red'); const r=S.rules.find(x=>x.id===id);
+      const t = prompt('Название', r.title); if(t===null) return;
+      const a = prompt('Сумма (без знака)', Math.abs(r.amount)); if(a===null) return;
+      const sign = r.amount>=0 ? 1 : -1; const num = Number(a)||Math.abs(r.amount);
+      r.title = (t.trim()||r.title); r.amount = sign*Math.abs(num); save(); renderAll();
+    };
+  });
+}
+
+// Actions
+document.getElementById('resetPeriod').onclick = ()=>{ if(!confirm('Сбросить текущий период?')) return; S.events=[]; save(); renderAll(); };
+document.getElementById('resetEvents').onclick = ()=>{ if(!confirm('Очистить все события?')) return; S.events=[]; save(); renderAll(); };
+
+document.getElementById('chAdd').onclick = ()=>{
+  const name = document.getElementById('chName').value.trim();
+  const start = Number(document.getElementById('chStart').value||0);
+  if(!name){ alert('Имя'); return; }
+  const avBox = document.getElementById('chAvatars'); const act = avBox.querySelector('.avpick.active'); const avatar = Number(act?.dataset.idx||0);
+  S.kids.push({ id: uuid(), name, start, avatar });
+  document.getElementById('chName').value=''; document.getElementById('chStart').value='';
+  save(); renderAll();
+};
+
+document.getElementById('rAdd').onclick = ()=>{
+  const type = document.getElementById('rType').value;
+  const title = document.getElementById('rTitle').value.trim();
+  const amountRaw = Number(document.getElementById('rAmount').value||0);
+  const scope = document.getElementById('rScope').value;
+  if(!title || !amountRaw){ alert('Заполни название и сумму'); return; }
+  const rule = { id: uuid(), title, type, amount: (type==='minus'?-Math.abs(amountRaw):Math.abs(amountRaw)), scope };
+  S.rules.push(rule);
+  document.getElementById('rTitle').value=''; document.getElementById('rAmount').value='10';
+  save(); renderAll();
+};
+
+document.getElementById('quickPlus').onchange = (e)=>{ S.quick.plus = Math.abs(Number(e.target.value||10)); save(); renderAll(); };
+document.getElementById('quickMinus').onchange = (e)=>{ S.quick.minus = Math.abs(Number(e.target.value||10)); save(); renderAll(); };
+
+function addEvent(kidId, {title, amount, ruleId}){
+  S.events.push({ id: uuid(), kidId, title, amount, ruleId: ruleId||null, ts: new Date().toISOString() });
+  save(); renderAll();
+}
+
+// ONBOARDING
+const ob = document.getElementById('onboarding');
+const steps = [];
+function setupOnboarding(){
+  document.querySelectorAll('#onboarding .step').forEach(s=>steps.push(s));
+  let idx=0;
+  function show(){ steps.forEach((s,i)=> s.style.display = (i===idx?'block':'none')); document.getElementById('obPrev').style.display = (idx===0?'none':''); document.getElementById('obNext').textContent = (idx===steps.length-1?'Готово':'Дальше'); }
+  document.getElementById('obPrev').onclick = ()=>{ if(idx>0){ idx--; show(); } };
+  document.getElementById('obNext').onclick = ()=>{
+    if(idx===0){
+      if(S.kids.length===0){ alert('Добавь хотя бы одного ребёнка'); return; }
+      idx++; renderObRules(); renderObScope(); show();
+    } else {
+      ob.style.display='none'; save(); renderAll();
+    }
+  };
+  renderObAvatars(); renderObKids(); renderObScope();
+  document.getElementById('obAddKid').onclick = ()=>{
+    const name = document.getElementById('obName').value.trim(); const start = Number(document.getElementById('obStart').value||0);
+    if(!name){ alert('Имя'); return; }
+    const act = document.querySelector('#obAvatars .avpick.active'); const avatar = Number(act?.dataset.idx||0);
+    S.kids.push({ id: uuid(), name, start, avatar });
+    document.getElementById('obName').value=''; document.getElementById('obStart').value='';
+    renderObKids(); renderObScope(); save();
+  };
+  document.getElementById('obAddRule').onclick = ()=>{
+    const type = document.getElementById('obType').value;
+    const title = document.getElementById('obTitle').value.trim();
+    const amountRaw = Number(document.getElementById('obAmount').value||0);
+    const scope = document.getElementById('obScope').value;
+    if(!title || !amountRaw){ alert('Заполни название и сумму'); return; }
+    const rule = { id: uuid(), title, type, amount:(type==='minus'?-Math.abs(amountRaw):Math.abs(amountRaw)), scope };
+    S.rules.push(rule); renderObRules(); save();
+    document.getElementById('obTitle').value=''; document.getElementById('obAmount').value='10';
+  };
+  document.getElementById('obPlus').onchange = (e)=>{ S.quick.plus = Math.abs(Number(e.target.value||10)); save(); };
+  document.getElementById('obMinus').onchange = (e)=>{ S.quick.minus = Math.abs(Number(e.target.value||10)); save(); };
+  show();
+}
+function renderObAvatars(){
+  const box = document.getElementById('obAvatars'); box.innerHTML='';
+  for(let i=0;i<10;i++){
+    const d = el(`<div class="avpick" data-idx="${i}">${monsterSVG(i)}</div>`);
+    if(i===0) d.classList.add('active');
+    d.onclick = ()=>{ box.querySelectorAll('.avpick').forEach(x=>x.classList.remove('active')); d.classList.add('active'); };
+    box.appendChild(d);
+  }
+}
+function renderObKids(){
+  const list = document.getElementById('obKidsList'); list.innerHTML='';
+  if(!S.kids.length){ list.innerHTML = '<div class="muted">Детей пока нет</div>'; return; }
+  S.kids.forEach(k=>{
+    const row = el(`<div class="kidcard"><div class="kid-left"><div class="avatar">${monsterSVG(k.avatar||0)}</div><div><div class="name">${k.name}</div><div class="muted" style="font-size:13px;">Старт: ${k.start}</div></div></div><button class="btn btn-bad" data-del="${k.id}">Удалить</button></div>`);
+    row.querySelector('[data-del]').onclick = ()=>{ S.kids=S.kids.filter(x=>x.id!==k.id); renderObKids(); renderObScope(); save(); };
+    list.appendChild(row);
+  });
+}
+function renderObRules(){
+  const box = document.getElementById('obRulesList'); box.innerHTML='';
+  if(S.rules.length===0){ box.innerHTML='<div class="muted">Пока нет правил</div>'; return; }
+  S.rules.forEach(r=>{
+    const who = r.scope==='all' ? 'Все дети' : ('Только: '+(S.kids.find(k=>k.id===r.scope)?.name||'—'));
+    const row = el(`<div class="kidcard"><div><b>${r.title}</b> <span class="muted">${r.amount>0?'+':''}${r.amount} • ${who}</span></div><button class="btn btn-bad" data-del="${r.id}">Удалить</button></div>`);
+    row.querySelector('[data-del]').onclick = ()=>{ S.rules=S.rules.filter(x=>x.id!==r.id); renderObRules(); save(); };
+    box.appendChild(row);
+  });
+}
+function renderObScope(){
+  const sel = document.getElementById('obScope'); sel.innerHTML='<option value="all">Для всех детей</option>';
+  S.kids.forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent='Только: '+k.name; sel.appendChild(o); });
+}
+
+// Render All
+function renderAll(){ renderHome(); renderSettings(); }
+renderAll();
+
+// Show onboarding if first run
+if(!S.kids || S.kids.length===0){ document.getElementById('onboarding').style.display='grid'; setupOnboarding(); }
+</script>
+</body>
+</html>
