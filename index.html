@@ -116,11 +116,12 @@
 #onboarding .ob-card .row:last-child{
   position: sticky;
   bottom: 0;
-  background: #6b8cff;  /* светло-синий */
-  color: #000;
-  border: none;
+  /* мягкий светлый фон под кнопками, без синей заливки */
+  background: linear-gradient(180deg, rgba(255,255,255,0), #fff 60%);
   padding-top: 12px;
   margin-top: 12px;
+  border-top: 1px solid #eee;
+  color: inherit;           /* вернёт нормальный цвет текста */
 }
 
 /* Немного места, чтобы контент не упирался в липкую панель */
